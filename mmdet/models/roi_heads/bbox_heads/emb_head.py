@@ -441,9 +441,9 @@ class EmbeddingBBoxHead(BBoxHead):
         """Switch class head to base or novel class embeddings
         """
         if class_set == 'base':
-            self._load_text_embedding(self.novel_emb_path)
-        elif class_set == 'novel':
             self._load_text_embedding(self.base_emb_path)
+        elif class_set == 'novel':
+            self._load_text_embedding(self.novel_emb_path)
         else:
             raise ValueError("class set should be 'base' or 'novel', "
                              f"but found {class_set}")
