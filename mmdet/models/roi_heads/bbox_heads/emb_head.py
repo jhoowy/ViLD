@@ -22,7 +22,8 @@ class EmbeddingBBoxHead(BBoxHead):
     """
 
     def __init__(self,
-                 emb_path,
+                 base_emb_path,
+                 novel_emb_path=None,
                  num_shared_convs=0,
                  num_shared_fcs=2,
                  num_cls_convs=0,
@@ -64,13 +65,12 @@ class EmbeddingBBoxHead(BBoxHead):
         self.temperature = temperature
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
-        self.emb_path = emb_path
+        self.base_emb_path = base_emb_path
+        self.novel_emb_path = novel_emb_path
         self.use_img_loss = use_img_loss
 
         # load text embeddings
-        text_embeddings = self.load_text_embedding(self.emb_path)
-        text_embeddings.requires_grad = False
-        self.register_buffer('text_embeddings', text_embeddings, persistent=False)
+        self._load_text_embedding(self.base_emb_path)
         self.bg_embedding = nn.init.uniform_(
                                 torch.empty((1, self.emb_channels)))
         self.bg_embedding = nn.Parameter(self.bg_embedding)
@@ -222,7 +222,8 @@ class EmbeddingBBoxHead(BBoxHead):
         return cls_score, bbox_pred, region_embed
 
     def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes,
-                           pos_gt_labels, pos_gt_embeds, cfg):
+                           pos_gt_labels, pos_gt_embeds, pos_gt_embed_weights,
+                           cfg):
         """Calculate the ground truth for proposals in the single image
         according to the sampling results.
 
@@ -241,6 +242,8 @@ class EmbeddingBBoxHead(BBoxHead):
                 all positive samples, has shape (num_pos, ).
             pos_gt_embeds (Tensor): Contains gt_embeds for
                 all positive samples, has shape (num_pos, emb_channels).
+            pos_gt_embed_weights (Tensor): Contains weights of gt_embed
+                for all positive samples, has shape (num_pos, ).
             cfg (obj:`ConfigDict`): `train_cfg` of R-CNN.
 
         Returns:
@@ -256,6 +259,10 @@ class EmbeddingBBoxHead(BBoxHead):
                   last dimension 4 represents [tl_x, tl_y, br_x, br_y].
                 - bbox_weights(Tensor):Regression weights for all
                   proposals, has shape (num_proposals, 4).
+                - embeds(Tensor):Gt_embeds for all proposals, has
+                  shape (num_proposals, emb_channels).
+                - embed_weights(Tensor):Loss weight for all gt embeds, has
+                  shape (num_proposals, emb_channels).
         """
         num_pos = pos_bboxes.size(0)
         num_neg = neg_bboxes.size(0)
@@ -275,6 +282,9 @@ class EmbeddingBBoxHead(BBoxHead):
         if num_pos > 0:
             labels[:num_pos] = pos_gt_labels
             embeds[:num_pos] = pos_gt_embeds
+            embed_weights[:num_pos, :] = 1
+            if len(pos_gt_embed_weights) > 0:
+                embed_weights[:num_pos, :] = pos_gt_embed_weights.unsqueeze(-1)
             pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
             label_weights[:num_pos] = pos_weight
             if not self.reg_decoded_bbox:
@@ -288,7 +298,6 @@ class EmbeddingBBoxHead(BBoxHead):
                 pos_bbox_targets = pos_gt_bboxes
             bbox_targets[:num_pos, :] = pos_bbox_targets
             bbox_weights[:num_pos, :] = 1
-            embed_weights[:num_pos, :] = 1
         if num_neg > 0:
             label_weights[-num_neg:] = 1.0
 
@@ -300,6 +309,7 @@ class EmbeddingBBoxHead(BBoxHead):
                     gt_bboxes,
                     gt_labels,
                     gt_embeds,
+                    gt_embed_weights,
                     rcnn_train_cfg,
                     concat=True):
         """
@@ -310,8 +320,11 @@ class EmbeddingBBoxHead(BBoxHead):
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
         pos_gt_embeds_list = []
+        pos_gt_embed_weights_list = []
         for i, res in enumerate(sampling_results):
             pos_gt_embeds_list.append(gt_embeds[i][res.pos_assigned_gt_inds])
+            if gt_embed_weights is not None:
+                pos_gt_embed_weights_list.append(gt_embed_weights[i][res.pos_assigned_gt_inds])
         labels, label_weights, bbox_targets, bbox_weights, \
         embeds, embed_weights = multi_apply(
             self._get_target_single,
@@ -320,6 +333,7 @@ class EmbeddingBBoxHead(BBoxHead):
             pos_gt_bboxes_list,
             pos_gt_labels_list,
             pos_gt_embeds_list,
+            pos_gt_embed_weights_list,
             cfg=rcnn_train_cfg)
 
         if concat:
@@ -412,11 +426,30 @@ class EmbeddingBBoxHead(BBoxHead):
 
         return losses
     
-    def load_text_embedding(self, emb_path):
+    def _load_text_embedding(self, emb_path):
         with open(emb_path, 'rb') as f:
-            text_embeds = pickle.load(f)
+            text_embeddings = pickle.load(f)
 
-        return torch.from_numpy(text_embeds).float()
+        text_embeddings = torch.from_numpy(text_embeddings).float()
+        if hasattr(self, 'text_embeddings'):
+            text_embeddings = text_embeddings.to(self.text_embeddings.device)
+        text_embeddings.requires_grad = False
+        self.register_buffer('text_embeddings', text_embeddings, persistent=False)
+        return self.text_embeddings
+
+    def switch_class(self, class_set):
+        """Switch class head to base or novel class embeddings
+        """
+        if class_set == 'base':
+            self._load_text_embedding(self.novel_emb_path)
+        elif class_set == 'novel':
+            self._load_text_embedding(self.base_emb_path)
+        else:
+            raise ValueError("class set should be 'base' or 'novel', "
+                             f"but found {class_set}")
+        
+        self.num_classes = self.text_embeddings.shape[0]
+
         
     @force_fp32(apply_to=('cls_score', 'bbox_pred'))
     def get_bboxes(self,

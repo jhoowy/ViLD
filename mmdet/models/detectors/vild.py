@@ -22,6 +22,7 @@ class ViLD(TwoStageDetector):
                       gt_bboxes,
                       gt_labels,
                       gt_embeds,
+                      gt_embed_weights=None,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None,
@@ -43,6 +44,9 @@ class ViLD(TwoStageDetector):
             gt_labels (list[Tensor]): class indices corresponding to each box
 
             gt_embeds (list[Tensor]): image embeddings corresponding to each box
+
+            gt_embed_weights (list[Tensor]): weight of image embeddings for weighted
+                embedding loss.
 
             gt_bboxes_ignore (None | list[Tensor]): specify which bounding
                 boxes can be ignored when computing the loss.
@@ -78,8 +82,8 @@ class ViLD(TwoStageDetector):
 
         roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
                                                  gt_bboxes, gt_labels, gt_embeds,
-                                                 gt_bboxes_ignore, gt_masks,
-                                                 **kwargs)
+                                                 gt_embed_weights, gt_bboxes_ignore, 
+                                                 gt_masks, **kwargs)
         losses.update(roi_losses)
 
         return losses

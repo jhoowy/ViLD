@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import numpy as np
 import pickle5 as pickle
+import json
 from tqdm import tqdm
 
 from lvis import LVIS
@@ -9,6 +10,7 @@ from lvis import LVIS
 import torch
 import clip
 from PIL import Image
+import matplotlib.pyplot as plt
 
 BASE_CLASSES = (
     'aerosol_can', 'air_conditioner', 'airplane', 'alarm_clock', 'alcohol', 
@@ -170,12 +172,12 @@ BASE_CLASSES = (
 ann_file = '/data/private/lvis_v1/annotations/lvis_v1_train.json'
 save_dir = '/data/private/lvis_v1/img_embeddings'
 data_root = '/data/private/lvis_v1/'
+ann_save_dir = '/data/private/lvis_v1/annotations/lvis_v1_train_embed.json'
 
 text_embed_path = '/data/private/lvis_v1/text_embeddings/lvis_cf.pickle'
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
 
 with open(text_embed_path ,'rb') as f:
     text_embed = pickle.load(f)
@@ -185,15 +187,19 @@ os.makedirs(osp.join(save_dir, 'train2017'), exist_ok=True)
 os.makedirs(osp.join(save_dir, 'val2017'), exist_ok=True)
 
 coco = LVIS(ann_file)
+
+cats = coco.dataset["categories"]
+cats = [cat for cat in cats if cat['name'] in BASE_CLASSES]
+cat_ids = [cat['id'] for cat in cats]
+cat2label = {cat_id: i for i, cat_id in enumerate(cat_ids)}
+
 img_ids = coco.get_img_ids()
-base_cat_ids = []
-for i in coco.cats:
-    if coco.cats[i]['name'] in BASE_CLASSES:
-        base_cat_ids.append(coco.cats[i]['id'])
 
 correct_count = 0
 incorrect_count = 0
 
+json_result = dict()
+chart = np.zeros(867)
 for i in tqdm(img_ids):
     img_info = coco.load_imgs([i])[0]
     filename = img_info['coco_url'].replace('http://images.cocodataset.org/', '')
@@ -201,15 +207,17 @@ for i in tqdm(img_ids):
     img = Image.open(osp.join(data_root, filename))
     outname = '.'.join((filename.split('.')[0], 'pickle'))
 
-    ann_ids = coco.get_ann_ids(img_ids=[i], cat_ids=base_cat_ids)
+    ann_ids = coco.get_ann_ids(img_ids=[i], cat_ids=cat_ids)
     ann_info = coco.load_anns(ann_ids)
-    embeddings = {}
+    with open(osp.join(save_dir, outname), 'rb') as f:
+        embeddings = pickle.load(f)
     for ann in ann_info:
         ann_id = ann['id']
+        gt_label = cat2label[ann['category_id']]
 
         if ann.get('ignore', False):
             continue
-
+            
         x1, y1, w, h = ann['bbox']
         inter_w = max(0, min(x1 + w, img_info['width']) - max(x1, 0))
         inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
@@ -218,13 +226,29 @@ for i in tqdm(img_ids):
         if ann['area'] <= 0 or w < 1 or h < 1:
             continue
 
-        im_crop = img.crop((x1, y1, x1 + w, y1 + h))
-        im_crop = preprocess(im_crop).unsqueeze(0).to(device)
-        with torch.no_grad():
-            im_embed = model.encode_image(im_crop)
-            im_embed /= im_embed.norm(dim=-1, keepdim=True)
+        im_embed = torch.from_numpy(embeddings[ann_id]).to(device)
+        scores = (100.0 * im_embed @ text_embed.T).softmax(dim=-1)
+        pred_label = int(torch.argmax(scores, dim=-1))
+        pred_score = float(scores[0, gt_label].cpu())
 
-        embeddings[ann_id] = im_embed.cpu().numpy()
-    
-    with open(osp.join(save_dir, outname), 'wb') as out:
-        pickle.dump(embeddings, out, pickle.HIGHEST_PROTOCOL)
+        sorted_score = torch.sort(scores[0]).values
+        rank = 866 - int((sorted_score == pred_score).nonzero()[0])
+        chart[rank] += 1
+
+        emb_weight = max(0.1, 1 / rank)
+
+        if pred_label == gt_label:
+            correct_count += 1
+            emb_weight = 1
+        else:
+            incorrect_count += 1
+
+        json_result[ann_id] = emb_weight
+
+with open(ann_save_dir, 'w') as out:
+    json.dump(json_result, out)
+
+print(f"Corrects: {correct_count}, incorrects: {incorrect_count}")
+plt.bar(np.arange(867), chart)
+plt.tight_layout()
+plt.savefig('emb_scores.png')

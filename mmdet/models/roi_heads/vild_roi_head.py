@@ -22,6 +22,7 @@ class ViLDRoIHead(StandardRoIHead):
                       gt_bboxes,
                       gt_labels,
                       gt_embeds,
+                      gt_embed_weights=None,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       **kwargs):
@@ -68,7 +69,8 @@ class ViLDRoIHead(StandardRoIHead):
         if self.with_bbox:
             bbox_results = self._bbox_forward_train(x, sampling_results,
                                                     gt_bboxes, gt_labels,
-                                                    gt_embeds, img_metas)
+                                                    gt_embeds, gt_embed_weights,
+                                                    img_metas)
             losses.update(bbox_results['loss_bbox'])
 
         # mask head forward and loss
@@ -95,14 +97,14 @@ class ViLDRoIHead(StandardRoIHead):
         return bbox_results
 
     def _bbox_forward_train(self, x, sampling_results, gt_bboxes, gt_labels,
-                            gt_embeds, img_metas):
+                            gt_embeds, gt_embed_weights, img_metas):
         """Run forward function and calculate loss for box head in training."""
         rois = bbox2roi([res.bboxes for res in sampling_results])
         bbox_results = self._bbox_forward(x, rois)
 
         bbox_targets = self.bbox_head.get_targets(sampling_results, gt_bboxes,
                                                   gt_labels, gt_embeds,
-                                                  self.train_cfg)
+                                                  gt_embed_weights, self.train_cfg)
         loss_bbox = self.bbox_head.loss(bbox_results['cls_score'],
                                         bbox_results['bbox_pred'], rois,
                                         *bbox_targets,

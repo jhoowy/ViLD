@@ -3,6 +3,8 @@ _base_ = [
     '../_base_/iter_runtime.py',
 ]
 
+# Selective Loss version
+
 # dataset settings
 dataset_type = 'LVISClipCFDataset'
 data_root = '/data/private/lvis_v1/' 
@@ -15,7 +17,9 @@ find_unused_parameters = True
 train_pipeline = [
     dict(type='LoadImageFromFile', to_float32=True),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='LoadEmbeddingFromFile'),
+    dict(type='LoadEmbeddingFromFile', 
+         with_score=True, 
+         ann_file=data_root + 'annotations/lvis_v1_train_embed.json'),
     dict(
         type='Resize',
         img_scale=image_size,
@@ -34,7 +38,7 @@ train_pipeline = [
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size=image_size),  # padding to image_size leads 0.5+ mAP
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_embeds']),
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_embeds', 'gt_embed_weights']),
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -104,7 +108,7 @@ model = dict(
             loss_cls=dict(
                 type='ViLDCrossEntropyLoss', loss_weight=1.0, T=0.01),
             loss_bbox=dict(loss_weight=1.0),
-            loss_img=dict(type='L1Loss', loss_weight=0.5))),
+            loss_img=dict(type='L1Loss', loss_weight=1.0))),
     # model training and testing settings
     test_cfg=dict(
         rcnn=dict(

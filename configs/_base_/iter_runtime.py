@@ -1,4 +1,4 @@
-checkpoint_config = dict(interval=10000)
+checkpoint_config = dict(interval=20000)
 # yapf:disable
 log_config = dict(
     interval=50,
@@ -13,4 +13,4 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 load_from = None
 resume_from = None
-workflow = [('train', 10000)]
+workflow = [('train', 1)]

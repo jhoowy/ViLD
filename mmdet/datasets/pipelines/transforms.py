@@ -4,6 +4,7 @@ import inspect
 import math
 import warnings
 
+import random
 import cv2
 import mmcv
 import numpy as np
@@ -779,8 +780,8 @@ class RandomCrop:
         }
         if self.use_embeds:
             self.bbox2embed = {
-                'gt_bboxes': 'gt_embeds',
-                'gt_bboxes_ignore': 'gt_embeds_ignore'
+                'gt_bboxes': ['gt_embeds', 'gt_embed_weights'],
+                'gt_bboxes_ignore': 'gt_embeds_ignore',
             }
 
     def _crop_data(self, results, crop_size, allow_negative_crop):
@@ -845,9 +846,10 @@ class RandomCrop:
                     results[key] = results[mask_key].get_bboxes()
             
             # embed fields, e.g. gt_embeds and gt_embeds_ignore
-            embed_key = self.bbox2embed.get(key)
-            if embed_key in results:
-                results[embed_key] = results[embed_key][valid_inds]
+            embed_keys = self.bbox2embed.get(key)
+            for embed_key in embed_keys:
+                if embed_key in results:
+                    results[embed_key] = results[embed_key][valid_inds]
 
         # crop semantic seg
         for key in results.get('seg_fields', []):
