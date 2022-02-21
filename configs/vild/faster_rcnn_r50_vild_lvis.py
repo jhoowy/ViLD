@@ -62,7 +62,7 @@ data = dict(
             type=dataset_type,
             ann_file=data_root + 'annotations/lvis_v1_train.json',
             img_prefix=data_root,
-            emb_prefix=data_root + 'img_embeddings/',
+            emb_prefix=data_root + 'img_embeddings_ens/',
             pipeline=train_pipeline)),
     val=dict(
         type='LVISClipRareDataset',
@@ -76,15 +76,14 @@ data = dict(
         pipeline=test_pipeline))
 
 # optimizer
-# optimizer = dict(type='SGD', lr=0.1, momentum=0.9, weight_decay=0.00004)
-optimizer = dict(type='SGD', lr=0.32, momentum=0.9, weight_decay=4e-5)
+optimizer = dict(type='SGD', lr=0.032, momentum=0.9, weight_decay=4e-5)
 optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(
     policy='step',
     warmup='linear',
     warmup_iters=1000,
-    warmup_ratio=0.01,
+    warmup_ratio=0.001,
     step=[162000, 171000, 175500])
 
 zero_shot_head = 'EmbeddingBBoxHead'
@@ -102,7 +101,8 @@ model = dict(
             base_emb_path=data_root + 'text_embeddings/lvis_cf.pickle',
             novel_emb_path=data_root + 'text_embeddings/lvis_r.pickle',
             loss_cls=dict(
-                type='ViLDCrossEntropyLoss', loss_weight=1.0, T=0.01),
+                # type='ViLDCrossEntropyLoss', loss_weight=1.0, T=0.01),
+                type='CrossEntropyLoss', use_sigomid=False, loss_weight=1.0),
             loss_bbox=dict(loss_weight=1.0),
             loss_img=dict(type='L1Loss', loss_weight=0.5))),
     # model training and testing settings
