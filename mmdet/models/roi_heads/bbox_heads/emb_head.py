@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pickle5 as pickle
+import numpy as np
 from mmcv.cnn import ConvModule
 
 from mmdet.core import multi_apply, multiclass_nms
@@ -25,11 +26,11 @@ class EmbeddingBBoxHead(BBoxHead):
                  base_emb_path,
                  novel_emb_path=None,
                  num_shared_convs=0,
-                 num_shared_fcs=2,
+                 num_shared_fcs=0,
                  num_cls_convs=0,
-                 num_cls_fcs=0,
+                 num_cls_fcs=2,
                  num_reg_convs=0,
-                 num_reg_fcs=0,
+                 num_reg_fcs=2,
                  conv_out_channels=256,
                  fc_out_channels=1024,
                  emb_channels=512,
@@ -74,6 +75,7 @@ class EmbeddingBBoxHead(BBoxHead):
         self.bg_embedding = nn.init.uniform_(
                                 torch.empty((1, self.emb_channels)))
         self.bg_embedding = nn.Parameter(self.bg_embedding)
+        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
         # add shared convs and fcs
         self.shared_convs, self.shared_fcs, last_layer_dim = \
@@ -132,7 +134,8 @@ class EmbeddingBBoxHead(BBoxHead):
                     override=[
                         dict(name='shared_fcs'),
                         dict(name='cls_fcs'),
-                        dict(name='reg_fcs')
+                        dict(name='reg_fcs'),
+                        dict(name='fc_proj')
                     ])
             ]
 
@@ -213,9 +216,11 @@ class EmbeddingBBoxHead(BBoxHead):
         for fc in self.reg_fcs:
             x_reg = self.relu(fc(x_reg))
 
-        region_embed = nn.functional.normalize(self.fc_proj(x_cls), dim=-1)
+        region_embed = F.normalize(self.fc_proj(x_cls), dim=-1)
+        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
+        logit_scale = self.logit_scale.exp()
         if self.with_cls:
-            cls_score = region_embed @ cls_emb.T
+            cls_score = logit_scale * region_embed @ cls_emb.t()
         else:
             cls_score = None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
@@ -223,7 +228,7 @@ class EmbeddingBBoxHead(BBoxHead):
 
     def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes,
                            pos_gt_labels, pos_gt_embeds, pos_gt_embed_weights,
-                           cfg):
+                           pos_is_gt, cfg):
         """Calculate the ground truth for proposals in the single image
         according to the sampling results.
 
@@ -285,6 +290,7 @@ class EmbeddingBBoxHead(BBoxHead):
             embed_weights[:num_pos, :] = 1
             if len(pos_gt_embed_weights) > 0:
                 embed_weights[:num_pos, :] = pos_gt_embed_weights.unsqueeze(-1)
+            embed_weights[:num_pos, :] *= pos_is_gt.unsqueeze(-1)
             pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
             label_weights[:num_pos] = pos_weight
             if not self.reg_decoded_bbox:
@@ -321,6 +327,7 @@ class EmbeddingBBoxHead(BBoxHead):
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
         pos_gt_embeds_list = []
         pos_gt_embed_weights_list = []
+        pos_is_gt_list = [res.pos_is_gt for res in sampling_results]
         for i, res in enumerate(sampling_results):
             pos_gt_embeds_list.append(gt_embeds[i][res.pos_assigned_gt_inds])
             if gt_embed_weights is not None:
@@ -334,6 +341,7 @@ class EmbeddingBBoxHead(BBoxHead):
             pos_gt_labels_list,
             pos_gt_embeds_list,
             pos_gt_embed_weights_list,
+            pos_is_gt_list,
             cfg=rcnn_train_cfg)
 
         if concat:
