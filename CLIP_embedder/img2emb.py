@@ -168,18 +168,11 @@ BASE_CLASSES = (
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
 ann_file = '/data/private/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/private/lvis_v1/img_embeddings'
+save_dir = '/data/private/lvis_v1/img_embeddings_ens'
 data_root = '/data/private/lvis_v1/'
-
-text_embed_path = '/data/private/lvis_v1/text_embeddings/lvis_cf.pickle'
-
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
-
-with open(text_embed_path ,'rb') as f:
-    text_embed = pickle.load(f)
-text_embed = torch.from_numpy(text_embed).to(device)
 
 os.makedirs(osp.join(save_dir, 'train2017'), exist_ok=True)
 os.makedirs(osp.join(save_dir, 'val2017'), exist_ok=True)
@@ -190,9 +183,6 @@ base_cat_ids = []
 for i in coco.cats:
     if coco.cats[i]['name'] in BASE_CLASSES:
         base_cat_ids.append(coco.cats[i]['id'])
-
-correct_count = 0
-incorrect_count = 0
 
 for i in tqdm(img_ids):
     img_info = coco.load_imgs([i])[0]
@@ -218,10 +208,21 @@ for i in tqdm(img_ids):
         if ann['area'] <= 0 or w < 1 or h < 1:
             continue
 
+        # x1.5 crop
+        x2 = max(0, x1 - w//2)
+        y2 = max(0, y1 - h//2)
+        xr2 = min(x1 + w + w//2, img_info['width'])
+        yr2 = min(y1 + h + h//2, img_info['height'])
+
         im_crop = img.crop((x1, y1, x1 + w, y1 + h))
         im_crop = preprocess(im_crop).unsqueeze(0).to(device)
+        im_crop2 = img.crop((x2, y2, xr2, yr2))
+        im_crop2 = preprocess(im_crop2).unsqueeze(0).to(device)
         with torch.no_grad():
+            # Fix later to batch inference
             im_embed = model.encode_image(im_crop)
+            im_embed2 = model.encode_image(im_crop2)
+            im_embed += im_embed2
             im_embed /= im_embed.norm(dim=-1, keepdim=True)
 
         embeddings[ann_id] = im_embed.cpu().numpy()

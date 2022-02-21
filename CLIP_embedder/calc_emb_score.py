@@ -170,9 +170,9 @@ BASE_CLASSES = (
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
 ann_file = '/data/private/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/private/lvis_v1/img_embeddings'
+save_dir = '/data/private/lvis_v1/img_embeddings_ens'
 data_root = '/data/private/lvis_v1/'
-ann_save_dir = '/data/private/lvis_v1/annotations/lvis_v1_train_embed.json'
+ann_save_dir = '/data/private/lvis_v1/annotations/lvis_v1_train_embed_ens.json'
 
 text_embed_path = '/data/private/lvis_v1/text_embeddings/lvis_cf.pickle'
 
@@ -182,9 +182,6 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 with open(text_embed_path ,'rb') as f:
     text_embed = pickle.load(f)
 text_embed = torch.from_numpy(text_embed).to(device)
-
-os.makedirs(osp.join(save_dir, 'train2017'), exist_ok=True)
-os.makedirs(osp.join(save_dir, 'val2017'), exist_ok=True)
 
 coco = LVIS(ann_file)
 
