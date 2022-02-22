@@ -38,6 +38,9 @@ class ViLDRoIHead(StandardRoIHead):
             gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
                 shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
             gt_labels (list[Tensor]): class indices corresponding to each box
+            gt_embeds (list[Tensor]): Image embeddings corresponding to each box
+            gt_embed_weights (list[Tensor]): Weight of image embeddings for weighted
+                embedding loss.
             gt_bboxes_ignore (None | list[Tensor]): specify which bounding
                 boxes can be ignored when computing the loss.
             gt_masks (None | Tensor) : true segmentation masks for each box

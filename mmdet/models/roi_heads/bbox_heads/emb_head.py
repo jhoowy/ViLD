@@ -34,7 +34,6 @@ class EmbeddingBBoxHead(BBoxHead):
                  conv_out_channels=256,
                  fc_out_channels=1024,
                  emb_channels=512,
-                 temperature=0.01,
                  loss_img=dict(
                      type='L1Loss',
                      loss_weight=0.5),
@@ -63,7 +62,6 @@ class EmbeddingBBoxHead(BBoxHead):
         self.conv_out_channels = conv_out_channels
         self.fc_out_channels = fc_out_channels
         self.emb_channels = emb_channels
-        self.temperature = temperature
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.base_emb_path = base_emb_path

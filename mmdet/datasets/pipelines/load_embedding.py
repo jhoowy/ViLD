@@ -53,7 +53,7 @@ class LoadEmbeddingFromFile:
             img_embeds = pickle.load(f)
 
         ann_ids = results['ann_info']['ann_ids']
-        gt_embeds = [img_embeds[id] for id in ann_ids]
+        gt_embeds = [img_embeds[id].astype(np.float32) for id in ann_ids]
         if len(gt_embeds) > 0:
             gt_embeds = np.concatenate(gt_embeds)
         else:
@@ -62,7 +62,7 @@ class LoadEmbeddingFromFile:
 
         if self.with_score:
             gt_embed_weights = np.array([self.embed_weights[id] for id in ann_ids])
-            results['gt_embed_weights'] = gt_embed_weights
+            results['gt_embed_weights'] = gt_embed_weights.astype(np.float32)
         return results
 
     def __repr__(self):

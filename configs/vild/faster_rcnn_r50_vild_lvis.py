@@ -52,7 +52,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=16,
+    samples_per_gpu=8,
     workers_per_gpu=2,
     train=dict(
         _delete_=True,
