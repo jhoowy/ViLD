@@ -57,7 +57,7 @@ class LoadEmbeddingFromFile:
         if len(gt_embeds) > 0:
             gt_embeds = np.concatenate(gt_embeds)
         else:
-            gt_embeds = np.empty((0, 512))
+            gt_embeds = np.empty((0, 512)).astype(np.float32)
         results['gt_embeds'] = gt_embeds
 
         if self.with_score:
