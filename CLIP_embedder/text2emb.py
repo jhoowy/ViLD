@@ -227,7 +227,7 @@ NOVEL_CLASSES = (
     'unicycle', 'vinegar', 'violin', 'vodka', 'vulture', 'waffle_iron', 
     'walrus', 'wardrobe', 'washbasin', 'water_heater', 'water_gun', 'wolf')
 
-save_dir = '/data/private/lvis_v1/text_embeddings'
+save_dir = '/data/project/rw/lvis_v1/text_embeddings'
 base_fname = 'lvis_cf.pickle'
 novel_fname = 'lvis_r.pickle'
 os.makedirs(save_dir, exist_ok=True)

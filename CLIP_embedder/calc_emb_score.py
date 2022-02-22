@@ -169,12 +169,12 @@ BASE_CLASSES = (
     'wok', 'wooden_spoon', 'wreath', 'wrench', 'wristband', 'wristlet', 
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
-ann_file = '/data/private/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/private/lvis_v1/img_embeddings_ens'
-data_root = '/data/private/lvis_v1/'
-ann_save_dir = '/data/private/lvis_v1/annotations/lvis_v1_train_embed_ens.json'
+ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
+save_dir = '/data/project/rw/lvis_v1/img_embeddings_ens'
+data_root = '/data/project/rw/lvis_v1/'
+ann_save_dir = '/data/project/rw/lvis_v1/annotations/lvis_v1_train_embed_ens.json'
 
-text_embed_path = '/data/private/lvis_v1/text_embeddings/lvis_cf.pickle'
+text_embed_path = '/data/project/rw/lvis_v1/text_embeddings/lvis_cf.pickle'
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

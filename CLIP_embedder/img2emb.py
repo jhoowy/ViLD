@@ -167,9 +167,9 @@ BASE_CLASSES = (
     'wok', 'wooden_spoon', 'wreath', 'wrench', 'wristband', 'wristlet', 
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
-ann_file = '/data/private/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/private/lvis_v1/img_embeddings_ens'
-data_root = '/data/private/lvis_v1/'
+ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
+save_dir = '/data/project/rw/lvis_v1/img_embeddings_ens'
+data_root = '/data/project/rw/lvis_v1/'
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
