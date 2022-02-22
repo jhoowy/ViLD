@@ -689,8 +689,8 @@ class DETRViLDHead(DETRHead):
                 with shape (n,)
         """
         # forward of this head requires img_metas
-        outs = self.forward(feats, img_metas)
-        results_list = self.get_bboxes(*outs, img_metas, rescale=rescale)
+        cls_scores, box_preds, _ = self.forward(feats, img_metas)
+        results_list = self.get_bboxes(cls_scores, box_preds, img_metas, rescale=rescale)
         return results_list
 
     def forward_onnx(self, feats, img_metas):
