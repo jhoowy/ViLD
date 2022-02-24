@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/detr_r50.py',
+    '../_base_/models/deformable_detr_r50.py',
     '../_base_/iter_runtime.py',
 ]
 
@@ -13,19 +13,11 @@ image_size = (1024, 1024)
 model = dict(
     type='DETRViLD',
     bbox_head=dict(
-        type='DETRViLDHead',
+        type='DeformableDETRViLDHead',
         num_classes=866,
         word_emb_dim=512,
         base_emb_path=data_root + 'text_embeddings/lvis_cf.pickle',
         novel_emb_path=data_root + 'text_embeddings/lvis_r.pickle',
-        loss_cls=dict(
-            type='CrossEntropyLoss',
-            bg_cls_weight=0.1,
-            use_sigmoid=False,
-            loss_weight=1.0,
-            class_weight=1.0),
-        loss_bbox=dict(type='L1Loss', loss_weight=5.0),
-        loss_iou=dict(type='GIoULoss', loss_weight=2.0),
         loss_img=dict(type='L1Loss', loss_weight=1.0)))
 
 # train_pipeline, NOTE the img_scale and the Pad's size_divisor is different
@@ -51,7 +43,7 @@ train_pipeline = [
             [
                 dict(
                     type='Resize',
-                    img_scale=[(400, 1333), (500, 1333), (600, 1333)],
+                    img_scale=[(400, 4200), (500, 4200), (600, 4200)],
                     multiscale_mode='value',
                     keep_ratio=True),
                 dict(
@@ -98,15 +90,19 @@ test_pipeline = [
 # optimizer
 optimizer = dict(
     type='AdamW',
-    lr=0.0001,
+    lr=2e-4,
     weight_decay=0.0001,
     paramwise_cfg=dict(
-        custom_keys={'backbone': dict(lr_mult=0.1, decay_mult=1.0)}))
+        custom_keys={
+            'backbone': dict(lr_mult=0.1),
+            'sampling_offsets': dict(lr_mult=0.1),
+            'reference_points': dict(lr_mult=0.1)
+        }))
 optimizer_config = dict(grad_clip=dict(max_norm=0.1, norm_type=2))
 # learning policy
-lr_config = dict(policy='step', step=[100])
-runner = dict(type='EpochBasedRunner', max_epochs=150)
-evaluation = dict(interval=10, metric='bbox')
+lr_config = dict(policy='step', step=[40])
+runner = dict(type='EpochBasedRunner', max_epochs=50)
+evaluation = dict(interval=5, metric='bbox')
 
 data = dict(
     samples_per_gpu=8,
@@ -132,4 +128,4 @@ data = dict(
         img_prefix=data_root,
         pipeline=test_pipeline))
 
-zero_shot_head = 'DETRViLDHead'
+zero_shot_head = 'DeformableDETRViLDHead'

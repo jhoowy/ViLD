@@ -163,21 +163,6 @@ class DETRViLDHead(DETRHead):
 
         self._init_layers()
 
-    def _init_layers(self):
-        """Initialize layers of the transformer head."""
-        self.input_proj = Conv2d(
-            self.in_channels, self.embed_dims, kernel_size=1)
-        self.fc_cls = Linear(self.embed_dims, self.cls_out_channels)
-        self.reg_ffn = FFN(
-            self.embed_dims,
-            self.embed_dims,
-            self.num_reg_fcs,
-            self.act_cfg,
-            dropout=0.0,
-            add_residual=False)
-        self.fc_reg = Linear(self.embed_dims, 4)
-        self.query_embedding = nn.Embedding(self.num_query, self.embed_dims)
-
     def init_weights(self):
         """Initialize weights of the transformer head."""
         # The initialization for transformer is important

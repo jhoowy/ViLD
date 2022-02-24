@@ -37,6 +37,7 @@ from .yolo_head import YOLOV3Head
 from .yolof_head import YOLOFHead
 from .yolox_head import YOLOXHead
 from .detr_vild_head import DETRViLDHead
+from .deformable_detr_vild_head import DeformableDETRViLDHead
 
 __all__ = [
     'AnchorFreeHead', 'AnchorHead', 'GuidedAnchorHead', 'FeatureAdaption',
@@ -49,5 +50,6 @@ __all__ = [
     'CascadeRPNHead', 'EmbeddingRPNHead', 'LDHead', 'CascadeRPNHead',
     'AutoAssignHead', 'DETRHead', 'YOLOFHead', 'DeformableDETRHead',
     'SOLOHead', 'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
-    'DecoupledSOLOLightHead', 'LADHead', 'DETRViLDHead'
+    'DecoupledSOLOLightHead', 'LADHead', 'DETRViLDHead',
+    'DeformableDETRViLDHead'
 ]
