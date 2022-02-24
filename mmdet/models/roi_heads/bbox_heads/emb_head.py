@@ -330,6 +330,11 @@ class EmbeddingBBoxHead(BBoxHead):
             pos_gt_embeds_list.append(gt_embeds[i][res.pos_assigned_gt_inds])
             if gt_embed_weights is not None:
                 pos_gt_embed_weights_list.append(gt_embed_weights[i][res.pos_assigned_gt_inds])
+            else:
+                if self.use_img_loss:
+                    pos_gt_embed_weights_list.append(torch.ones_like(pos_gt_labels_list[i]))
+                else:
+                    pos_gt_embed_weights_list.append(torch.zeros_like(pos_gt_labels_list[i]))
         labels, label_weights, bbox_targets, bbox_weights, \
         embeds, embed_weights = multi_apply(
             self._get_target_single,
