@@ -5,6 +5,8 @@ import pickle5 as pickle
 
 import torch
 import clip
+import inflect
+from lvis import LVIS
 
 BASE_CLASSES = (
     'aerosol_can', 'air_conditioner', 'airplane', 'alarm_clock', 'alcohol', 
@@ -227,15 +229,118 @@ NOVEL_CLASSES = (
     'unicycle', 'vinegar', 'violin', 'vodka', 'vulture', 'waffle_iron', 
     'walrus', 'wardrobe', 'washbasin', 'water_heater', 'water_gun', 'wolf')
 
+PROMPTS = [
+    'There is {article} {category} in the scene.',
+    'There is the {category} in the scene.',
+    'a photo of {article} {category} in the scene.',
+    'a photo of the {category} in the scene.',
+    'a photo of one {category} in the scene.',
+    'itap of {article} {category}.',
+    'itap of my {category}.',
+    'itap of the {category}.',
+    'a photo of {article} {category}.',
+    'a photo of my {category}.',
+    'a photo of the {category}.',
+    'a photo of one {category}.',
+    'a photo of many {category}.',
+    'a good photo of {article} {category}.',
+    'a good photo of the {category}.',
+    'a bad photo of {article} {category}.',
+    'a bad photo of the {category}.',
+    'a photo of a nice {category}.',
+    'a photo of the nice {category}.',
+    'a photo of a cool {category}.',
+    'a photo of the cool {category}.',
+    'a photo of a weird {category}.',
+    'a photo of the weird {category}.',
+    'a photo of a small {category}.',
+    'a photo of the small {category}.',
+    'a photo of a large {category}.',
+    'a photo of the large {category}.',
+    'a photo of a clean {category}.',
+    'a photo of the clean {category}.',
+    'a photo of a dirty {category}.',
+    'a photo of the dirty {category}.',
+    'a bright photo of {article} {category}.',
+    'a bright photo of the {category}.',
+    'a dark photo of {article} {category}.',
+    'a dark photo of the {category}.',
+    'a photo of a hard to see {category}.',
+    'a photo of the hard to see {category}.',
+    'a low resolution photo of {article} {category}.',
+    'a low resolution photo of the {category}.',
+    'a cropped photo of {article} {category}.',
+    'a cropped photo of the {category}.',
+    'a close-up photo of {article} {category}.',
+    'a close-up photo of the {category}.',
+    'a jpeg corrupted photo of {article} {category}.',
+    'a jpeg corrupted photo of the {category}.',
+    'a blurry of {article} {category}.',
+    'a blurry of the {category}.',
+    'a pixelated photo of {article} {category}.',
+    'a pixelated photo of the {category}.',
+    'a black and white photo of {article} {category}.',
+    'a black and white photo of the {category}.',
+    'a plastic {category}.',
+    'the plastic {category}.',
+    'a toy {category}.',
+    'the toy {category}.',
+    'a plushie {category}.',
+    'the plushie {category}.',
+    'a cartoon {category}.',
+    'the cartoon {category}.',
+    'an embroidered {category}.',
+    'the embroidered {category}.',
+    'a painting of the {category}.',
+    'a painting of a {category}.']
+
+ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
 save_dir = '/data/project/rw/lvis_v1/text_embeddings'
 base_fname = 'lvis_cf.pickle'
 novel_fname = 'lvis_r.pickle'
 os.makedirs(save_dir, exist_ok=True)
 
+coco = LVIS(ann_file)
+cats = coco.dataset['categories']
+base_cats = [cat for cat in cats if cat['name'] in BASE_CLASSES]
+novel_cats = [cat for cat in cats if cat['name'] in NOVEL_CLASSES]
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
+ie = inflect.engine()
+
+base_features = []
+novel_features = []
+with torch.no_grad():
+    for cat in base_cats:
+        inputs = []
+        for category in cat['synonyms']:
+            article = ie.a(category)
+            for prompt in PROMPTS:
+                inputs.append(clip.tokenize(prompt.format(article=article, category=category)))
+        inputs = torch.cat(inputs).to(device)
+        features = torch.mean(model.encode_text(inputs), dim=0)
+        base_features.append(features)
+
+    for cat in novel_cats:
+        inputs = []
+        for category in cat['synonyms']:
+            article = ie.a(category)
+            for prompt in PROMPTS:
+                inputs.append(clip.tokenize(prompt.format(article=article, category=category)))
+        inputs = torch.cat(inputs).to(device)
+        features = torch.mean(model.encode_text(inputs), dim=0)
+        novel_features.append(features)
+    
+base_features = torch.stack(base_features)
+novel_features = torch.stack(novel_features)
+base_features /= base_features.norm(dim=-1, keepdim=True)
+novel_features /= novel_features.norm(dim=-1, keepdim=True)
+
+
+"""
+# Single prompt version
 base_inputs = torch.cat([clip.tokenize(f"a photo of {c} in the scene") for c in BASE_CLASSES]).to(device)
 novel_inputs = torch.cat([clip.tokenize(f"a photo of {c} in the scene") for c in NOVEL_CLASSES]).to(device)
 with torch.no_grad():
@@ -244,8 +349,8 @@ with torch.no_grad():
 
 base_features /= base_features.norm(dim=-1, keepdim=True)
 novel_features /= novel_features.norm(dim=-1, keepdim=True)
+"""
 
-bf = base_features
 base_features = base_features.cpu().numpy()
 novel_features = novel_features.cpu().numpy()
 
