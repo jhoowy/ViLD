@@ -1,0 +1,16 @@
+--find-links https://download.openmmlab.com/mmcv/dist/cu101/torch1.8.0/index.html
+mmcv-full==1.4.4
+mmdet
+terminaltables
+lvis
+pickle5
+scipy
+
+# CLIP
+ftfy
+regex
+tqdm
+git+https://github.com/openai/CLIP.git
+inflect
+
+
