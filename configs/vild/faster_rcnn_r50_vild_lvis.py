@@ -101,8 +101,7 @@ model = dict(
             base_emb_path=data_root + 'text_embeddings/lvis_cf.pickle',
             novel_emb_path=data_root + 'text_embeddings/lvis_r.pickle',
             loss_cls=dict(
-                # type='ViLDCrossEntropyLoss', loss_weight=1.0, T=0.01),
-                type='CrossEntropyLoss', use_sigomid=False, loss_weight=1.0),
+                type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(loss_weight=1.0),
             loss_img=dict(type='L1Loss', loss_weight=0.5))),
     # model training and testing settings
