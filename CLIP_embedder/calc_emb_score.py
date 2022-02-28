@@ -11,6 +11,7 @@ import torch
 import clip
 from PIL import Image
 import matplotlib.pyplot as plt
+import argparse
 
 BASE_CLASSES = (
     'aerosol_can', 'air_conditioner', 'airplane', 'alarm_clock', 'alcohol', 
@@ -169,13 +170,18 @@ BASE_CLASSES = (
     'wok', 'wooden_spoon', 'wreath', 'wrench', 'wristband', 'wristlet', 
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
-ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/project/rw/lvis_v1/img_embeddings_ens'
-data_root = '/data/project/rw/lvis_v1/'
-ann_save_dir = '/data/project/rw/lvis_v1/annotations/lvis_v1_train_embed_ens.json'
+parser = argparse.ArgumentParser(description='Calculate embedding weights for ViLD-SL')
+parser.add_argument('--data_root', default='/data/project/rw/lvis_v1', type=str)
+parser.add_argument('--save_dir', default='img_embeddings', type=str)
+parser.add_argument('--ann_save_dir', default='annotations/lvis_v1_train.json', type=str)
+parser.add_argument('--text_embed_path', default='text_embeddings/lvis_cf.pickle', type=str)
+args = parser.parse_args()
 
-text_embed_path = '/data/project/rw/lvis_v1/text_embeddings/lvis_cf.pickle'
-
+data_root = args.data_root
+ann_file = osp.join(data_root, 'annotations/lvis_v1_train.json')
+save_dir = osp.join(data_root, args.save_dir)
+ann_save_dir = osp.join(data_root, args.ann_save_dir)
+text_embed_path = osp.join(data_root, args.text_embed_path)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 

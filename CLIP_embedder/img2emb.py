@@ -9,6 +9,7 @@ from lvis import LVIS
 import torch
 import clip
 from PIL import Image
+import argparse
 
 BASE_CLASSES = (
     'aerosol_can', 'air_conditioner', 'airplane', 'alarm_clock', 'alcohol', 
@@ -167,9 +168,14 @@ BASE_CLASSES = (
     'wok', 'wooden_spoon', 'wreath', 'wrench', 'wristband', 'wristlet', 
     'yacht', 'yogurt', 'yoke_(animal_equipment)', 'zebra', 'zucchini')
 
-ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/project/rw/lvis_v1/img_embeddings_ens'
-data_root = '/data/project/rw/lvis_v1/'
+parser = argparse.ArgumentParser(description='Create image embedding for ViLD')
+parser.add_argument('--data_root', default='/data/project/rw/lvis_v1', type=str)
+parser.add_argument('--save_dir', default='img_embeddings', type=str)
+args = parser.parse_args()
+
+data_root = args.data_root
+ann_file = osp.join(data_root, 'annotations/lvis_v1_train.json')
+save_dir = osp.join(data_root, args.save_dir)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)

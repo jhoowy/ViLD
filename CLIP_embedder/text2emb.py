@@ -7,6 +7,7 @@ import torch
 import clip
 import inflect
 from lvis import LVIS
+import argparse
 
 BASE_CLASSES = (
     'aerosol_can', 'air_conditioner', 'airplane', 'alarm_clock', 'alcohol', 
@@ -294,8 +295,15 @@ PROMPTS = [
     'a painting of the {category}.',
     'a painting of a {category}.']
 
-ann_file = '/data/project/rw/lvis_v1/annotations/lvis_v1_train.json'
-save_dir = '/data/project/rw/lvis_v1/text_embeddings'
+parser = argparse.ArgumentParser(description='Create text embedding for ViLD')
+parser.add_argument('--data_root', default='/data/project/rw/lvis_v1', type=str)
+parser.add_argument('--save_dir', default='text_embeddings', type=str)
+args = parser.parse_args()
+
+data_root = args.data_root
+ann_file = osp.join(data_root, 'annotations/lvis_v1_train.json')
+save_dir = osp.join(data_root, args.save_dir)
+
 base_fname = 'lvis_cf.pickle'
 novel_fname = 'lvis_r.pickle'
 os.makedirs(save_dir, exist_ok=True)
