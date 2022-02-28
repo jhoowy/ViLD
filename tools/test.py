@@ -16,7 +16,7 @@ from mmcv.runner import (get_dist_info, init_dist, load_checkpoint,
 from mmdet.apis import multi_gpu_test, single_gpu_test
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
-from mmdet.models import build_detector
+from mmdet.models import build_detector, HEADS
 from mmdet.utils import setup_multi_processes
 
 
@@ -207,6 +207,16 @@ def main():
     # build the model and load checkpoint
     cfg.model.train_cfg = None
     model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
+
+    # switch class for zero-shot prediction
+    head_type = cfg.get('zero_shot_head', None)
+    assert head_type is not None
+    head_type = HEADS.get(head_type)
+    assert hasattr(head_type, 'switch_class')
+    for name, m in model.named_modules():
+        if isinstance(m, head_type):
+            m.switch_class('novel')
+
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
