@@ -173,7 +173,7 @@ BASE_CLASSES = (
 parser = argparse.ArgumentParser(description='Calculate embedding weights for ViLD-SL')
 parser.add_argument('--data_root', default='/data/project/rw/lvis_v1', type=str)
 parser.add_argument('--save_dir', default='img_embeddings', type=str)
-parser.add_argument('--ann_save_dir', default='annotations/lvis_v1_train.json', type=str)
+parser.add_argument('--ann_save_dir', default='annotations/lvis_v1_train_embed.json', type=str)
 parser.add_argument('--text_embed_path', default='text_embeddings/lvis_cf.pickle', type=str)
 args = parser.parse_args()
 
