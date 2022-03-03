@@ -572,9 +572,9 @@ class DETRViLDHead(DETRHead):
         img_h, img_w, _ = img_meta['img_shape']
 
         # embed targets
-        embeds = gt_bboxes.new_zeros(num_bboxes, self.word_emb_dim)
+        embeds = gt_bboxes.new_zeros(num_bboxes, self.word_embed_dim)
         embeds[pos_inds] = gt_embeds[sampling_result.pos_assigned_gt_inds]
-        embed_weights = gt_bboxes.new_zeros(num_bboxes, self.word_emb_dim)
+        embed_weights = gt_bboxes.new_zeros(num_bboxes, self.word_embed_dim)
         if len(gt_embed_weights) > 0:
             embed_weights[pos_inds] = \
                 gt_embed_weights[sampling_result.pos_assigned_gt_inds].unsqueeze(-1)

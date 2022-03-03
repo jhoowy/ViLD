@@ -50,3 +50,9 @@ class DETRViLD(DETR):
                                               gt_embed_weights,
                                               gt_bboxes_ignore)
         return losses
+
+@DETECTORS.register_module()
+class DeformableDETRViLD(DETRViLD):
+
+    def __init__(self, *args, **kwargs):
+        super(DETR, self).__init__(*args, **kwargs)

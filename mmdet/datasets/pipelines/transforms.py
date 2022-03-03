@@ -845,11 +845,12 @@ class RandomCrop:
                 if self.recompute_bbox:
                     results[key] = results[mask_key].get_bboxes()
             
-            # embed fields, e.g. gt_embeds and gt_embeds_ignore
-            embed_keys = self.bbox2embed.get(key)
-            for embed_key in embed_keys:
-                if embed_key in results:
-                    results[embed_key] = results[embed_key][valid_inds]
+            if self.use_embeds:
+                # embed fields, e.g. gt_embeds and gt_embeds_ignore
+                embed_keys = self.bbox2embed.get(key)
+                for embed_key in embed_keys:
+                    if embed_key in results:
+                        results[embed_key] = results[embed_key][valid_inds]
 
         # crop semantic seg
         for key in results.get('seg_fields', []):

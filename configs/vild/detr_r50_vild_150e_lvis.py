@@ -7,7 +7,6 @@ _base_ = [
 dataset_type = 'LVISClipCFDataset'
 data_root = '/data/project/rw/lvis_v1/' 
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-image_size = (1024, 1024)
 
 # ViLD version model
 model = dict(
@@ -35,7 +34,7 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='LoadEmbeddingFromFile', 
          with_score=True, 
-         ann_file=data_root + 'annotations/lvis_v1_train_embed_ens.json'),
+         ann_file=data_root + 'annotations/lvis_v1_train_embed.json'),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(
         type='AutoAugment',
@@ -119,7 +118,7 @@ data = dict(
             type=dataset_type,
             ann_file=data_root + 'annotations/lvis_v1_train.json',
             img_prefix=data_root,
-            emb_prefix=data_root + 'img_embeddings_ens/',
+            emb_prefix=data_root + 'img_embeddings/',
             pipeline=train_pipeline)),
     val=dict(
         type='LVISClipRareDataset',

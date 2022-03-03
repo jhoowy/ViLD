@@ -4,6 +4,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from mmcv.cnn import Linear, bias_init_with_prob, constant_init
 from mmcv.runner import force_fp32
 
@@ -146,16 +147,18 @@ class DeformableDETRViLDHead(DETRViLDHead):
         if not self.as_two_stage:
             query_embeds = self.query_embedding.weight
         hs, init_reference, inter_references, \
-            enc_outputs_class, enc_outputs_coord = self.transformer(
-                    mlvl_feats,
-                    mlvl_masks,
-                    query_embeds,
-                    mlvl_positional_encodings,
-                    reg_branches=self.reg_branches if self.with_box_refine else None,  # noqa:E501
-                    cls_branches=self.cls_branches if self.as_two_stage else None  # noqa:E501
-            )
-        enc_region_embeds = F.normalize(enc_outputs_class, dim=-1)
-        enc_outputs_class = logit_scale * enc_region_embeds @ cls_emb
+        enc_outputs_class, enc_outputs_coord = self.transformer(
+                mlvl_feats,
+                mlvl_masks,
+                query_embeds,
+                mlvl_positional_encodings,
+                reg_branches=self.reg_branches if self.with_box_refine else None,  # noqa:E501
+                cls_branches=self.cls_branches if self.as_two_stage else None  # noqa:E501
+        )
+        if enc_outputs_class is not None:
+            enc_region_embeds = F.normalize(enc_outputs_class, dim=-1)
+            enc_outputs_class = logit_scale * enc_region_embeds @ cls_emb
+
         hs = hs.permute(0, 2, 1, 3)
         outputs_classes = []
         outputs_coords = []
@@ -268,8 +271,8 @@ class DeformableDETRViLDHead(DETRViLDHead):
             enc_loss_cls, enc_losses_bbox, enc_losses_iou, enc_losses_img = \
                 self.loss_single(enc_cls_scores, enc_bbox_preds, 
                                  enc_region_embeds, gt_bboxes_list, 
-                                 binary_labels_list, all_gt_embeds_list,
-                                 all_gt_embed_weights_list,
+                                 binary_labels_list, gt_embeds_list,
+                                 gt_embed_weights,
                                  img_metas, gt_bboxes_ignore)
             loss_dict['enc_loss_cls'] = enc_loss_cls
             loss_dict['enc_loss_bbox'] = enc_losses_bbox

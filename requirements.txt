@@ -1,7 +1,7 @@
 torch==1.8.1
 torchvision==0.9.1
 --find-links https://download.openmmlab.com/mmcv/dist/cu101/torch1.8.0/index.html
-mmcv-full==1.4.4
+mmcv-full==1.4.2
 mmdet
 terminaltables
 lvis
@@ -14,5 +14,3 @@ regex
 tqdm
 git+https://github.com/openai/CLIP.git
 inflect
-
-
