@@ -40,7 +40,6 @@ os.makedirs(osp.join(save_dir, 'val2017'), exist_ok=True)
 
 coco = LVIS(ann_file)
 img_ids = coco.get_img_ids()
-img_ids = img_ids
 
 for i in tqdm(img_ids):
     img_info = coco.load_imgs([i])[0]
