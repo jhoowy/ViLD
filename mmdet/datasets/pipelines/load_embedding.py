@@ -58,9 +58,9 @@ class LoadEmbeddingFromFile:
         gt_embed_scores = data['scores']
 
         if len(gt_embeds) > 0:
-            gt_embeds = np.concatenate(gt_embeds).astype(np.float32)
-            gt_embed_bboxes = np.concatenate(gt_embed_bboxes).astype(np.float32)
-            gt_embed_scores = np.concatenate(gt_embed_scores).astype(np.float32)
+            gt_embeds = gt_embeds.astype(np.float32)
+            gt_embed_bboxes = gt_embed_bboxes.astype(np.float32)
+            gt_embed_scores = gt_embed_scores.astype(np.float32)
         else:
             gt_embeds = np.empty((0.512)).astype(np.float32)
             gt_embed_bboxes = np.empty((0, 4)).astype(np.float32)
@@ -70,7 +70,7 @@ class LoadEmbeddingFromFile:
         results['gt_embed_bboxes'] = gt_embed_bboxes
         results['gt_embed_scores'] = gt_embed_scores
         results['bbox_fields'].append('gt_embed_bboxes')
-        
+
         return results
 
     def __repr__(self):

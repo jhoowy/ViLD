@@ -179,21 +179,6 @@ class ViLDBBoxHead(BBoxHead):
         return branch_convs, branch_fcs, last_layer_dim
 
     def forward(self, x):
-        region_embed = self.forward_embed(x)
-        cls_emb = torch.cat((self.text_embeddings, self.bg_embedding), dim=0)
-
-        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
-        logit_scale = self.logit_scale.exp()
-
-        if self.with_cls:
-            cls_score = logit_scale * region_embed @ cls_emb.t()
-        else:
-            cls_score = None
-        bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-
-        return cls_score, bbox_pred
-
-    def forward_embed(self, x):
         # shared part
         if self.num_shared_convs > 0:
             for conv in self.shared_convs:
@@ -226,6 +211,44 @@ class ViLDBBoxHead(BBoxHead):
             x_reg = x_reg.flatten(1)
         for fc in self.reg_fcs:
             x_reg = self.relu(fc(x_reg))
+            
+        region_embed = F.normalize(self.fc_proj(x_cls), dim=-1)
+        cls_emb = torch.cat((self.text_embeddings, self.bg_embedding), dim=0)
+
+        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
+        logit_scale = self.logit_scale.exp()
+
+        if self.with_cls:
+            cls_score = logit_scale * region_embed @ cls_emb.t()
+        else:
+            cls_score = None
+        bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
+
+        return cls_score, bbox_pred
+
+    def forward_embed(self, x):
+        # shared part
+        if self.num_shared_convs > 0:
+            for conv in self.shared_convs:
+                x = conv(x)
+
+        if self.num_shared_fcs > 0:
+            if self.with_avg_pool:
+                x = self.avg_pool(x)
+
+            x = x.flatten(1)
+
+            for fc in self.shared_fcs:
+                x = self.relu(fc(x))
+        # separate branches
+        x_cls = x
+
+        if x_cls.dim() > 2:
+            if self.with_avg_pool:
+                x_cls = self.avg_pool(x_cls)
+            x_cls = x_cls.flatten(1)
+        for fc in self.cls_fcs:
+            x_cls = self.relu(fc(x_cls))
 
         region_embed = F.normalize(self.fc_proj(x_cls), dim=-1)
         return region_embed
@@ -297,6 +320,8 @@ class ViLDBBoxHead(BBoxHead):
                 embed_weights = embed_weights.unsqueeze(-1)
                 embed_weights = embed_weights.expand(-1, self.embed_channels)
 
+            bs = len(embeds)
+            embeds = torch.cat(embeds)
             losses['loss_img'] = self.loss_img(
                 region_embed,
                 embeds,

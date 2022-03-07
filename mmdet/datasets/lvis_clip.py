@@ -2,6 +2,9 @@ import os
 import os.path as osp
 import warnings
 import numpy as np
+
+import matplotlib
+matplotlib.use("pdf") # Prevent hanging issue
 from mmdet.datasets.builder import DATASETS
 
 from mmdet.datasets import LVISV1Dataset

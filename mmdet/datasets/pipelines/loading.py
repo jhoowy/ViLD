@@ -571,7 +571,7 @@ class FilterAnnotations:
             else:
                 return results
         else:
-            keys = ('gt_bboxes', 'gt_labels', 'gt_masks', 'gt_semantic_seg', 'gt_embeds')
+            keys = ('gt_bboxes', 'gt_labels', 'gt_masks', 'gt_semantic_seg')
             for key in keys:
                 if key in results:
                     results[key] = results[key][keep]

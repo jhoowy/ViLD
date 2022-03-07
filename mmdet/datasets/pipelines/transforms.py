@@ -780,7 +780,7 @@ class RandomCrop:
         }
         if self.use_embeds:
             self.bbox2embed = {
-                'gt_embed_bboxes': ['gt_embeds', 'gt_embed_weights']
+                'gt_embed_bboxes': ['gt_embeds', 'gt_embed_scores']
             }
 
     def _crop_data(self, results, crop_size, allow_negative_crop):
@@ -846,7 +846,7 @@ class RandomCrop:
             
             if self.use_embeds:
                 # embed fields, e.g. gt_embeds and gt_embeds_ignore
-                embed_keys = self.bbox2embed.get(key)
+                embed_keys = self.bbox2embed.get(key, [])
                 for embed_key in embed_keys:
                     if embed_key in results:
                         results[embed_key] = results[embed_key][valid_inds]

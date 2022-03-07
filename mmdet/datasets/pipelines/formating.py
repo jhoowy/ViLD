@@ -222,7 +222,7 @@ class DefaultFormatBundle:
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
             results['img'] = DC(to_tensor(img), stack=True)
         for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels', 
-                    'gt_embeds', 'gt_embed_weights']:
+                    'gt_embeds', 'gt_embed_bboxes', 'gt_embed_scores']:
             if key not in results:
                 continue
             results[key] = DC(to_tensor(results[key]))

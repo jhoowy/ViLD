@@ -28,7 +28,8 @@ train_pipeline = [
         crop_type='absolute_range',
         crop_size=image_size,
         recompute_bbox=True,
-        allow_negative_crop=True),
+        allow_negative_crop=True,
+        use_embeds=True),
     dict(type='FilterAnnotations', min_gt_bbox_wh=(1e-2, 1e-2)),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
@@ -108,8 +109,8 @@ model = dict(
             norm_cfg=norm_cfg),
         mask_head=dict(
             class_agnostic=True,
-            num_classes=337),
-            norm_cfg=norm_cfg),
+            num_classes=337,
+            norm_cfg=norm_cfg)),
     # model training and testing settings
     test_cfg=dict(
         rcnn=dict(
