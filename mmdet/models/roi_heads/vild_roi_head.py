@@ -11,6 +11,7 @@ from mmdet.models.roi_heads import StandardRoIHead
 @HEADS.register_module()
 class ViLDRoIHead(StandardRoIHead):
     """ViLD: Vision and Language Knowledge Distillation
+    TODO: Decouple with ViLDBBoxHead
 
     https://arxiv.org/abs/2104.13921
     """
@@ -22,6 +23,7 @@ class ViLDRoIHead(StandardRoIHead):
                       gt_bboxes,
                       gt_labels,
                       gt_embeds,
+                      gt_embed_bboxes,
                       gt_embed_weights=None,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
@@ -72,8 +74,8 @@ class ViLDRoIHead(StandardRoIHead):
         if self.with_bbox:
             bbox_results = self._bbox_forward_train(x, sampling_results,
                                                     gt_bboxes, gt_labels,
-                                                    gt_embeds, gt_embed_weights,
-                                                    img_metas)
+                                                    gt_embeds, gt_embed_bboxes,
+                                                    gt_embed_weights, img_metas)
             losses.update(bbox_results['loss_bbox'])
 
         # mask head forward and loss
@@ -85,33 +87,29 @@ class ViLDRoIHead(StandardRoIHead):
 
         return losses
 
-    def _bbox_forward(self, x, rois):
-        """Box head forward function used in both training and testing."""
-        # TODO: a more flexible way to decide which feature maps to use
-        bbox_feats = self.bbox_roi_extractor(
-            x[:self.bbox_roi_extractor.num_inputs], rois)
-        if self.with_shared_head:
-            bbox_feats = self.shared_head(bbox_feats)
-        cls_score, bbox_pred, region_embed = self.bbox_head(bbox_feats)
-
-        bbox_results = dict(
-            cls_score=cls_score, bbox_pred=bbox_pred, bbox_feats=bbox_feats, 
-            region_embed=region_embed)
-        return bbox_results
-
     def _bbox_forward_train(self, x, sampling_results, gt_bboxes, gt_labels,
-                            gt_embeds, gt_embed_weights, img_metas):
+                            gt_embeds, gt_embed_bboxes, gt_embed_weights, 
+                            img_metas):
         """Run forward function and calculate loss for box head in training."""
         rois = bbox2roi([res.bboxes for res in sampling_results])
         bbox_results = self._bbox_forward(x, rois)
 
+        embed_rois = bbox2roi([bboxes for bboxes in gt_embed_bboxes])
+        embed_feats = self.bbox_roi_extractor(
+            x[:self.bbox_roi_extractor.num_inputs], embed_rois)
+        if self.with_shared_head:
+            embed_feats = self.shared_head(embed_feats)
+        
+        image_embeds = self.bbox_head.forward_embed(embed_feats)
+
         bbox_targets = self.bbox_head.get_targets(sampling_results, gt_bboxes,
-                                                  gt_labels, gt_embeds,
-                                                  gt_embed_weights, self.train_cfg)
+                                                  gt_labels, self.train_cfg)
         loss_bbox = self.bbox_head.loss(bbox_results['cls_score'],
                                         bbox_results['bbox_pred'], rois,
                                         *bbox_targets,
-                                        region_embed=bbox_results['region_embed'])
+                                        embeds=gt_embeds,
+                                        embed_weights=gt_embed_weights,
+                                        region_embed=image_embeds)
 
         bbox_results.update(loss_bbox=loss_bbox)
         return bbox_results

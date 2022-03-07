@@ -7,6 +7,7 @@ _base_ = [
 dataset_type = 'LVISClipCFDataset'
 data_root = '/data/project/rw/lvis_v1/' 
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+norm_cfg = dict(type='SyncBN', requires_grad=True)
 image_size = (1024, 1024)
 
 find_unused_parameters = True
@@ -27,14 +28,13 @@ train_pipeline = [
         crop_type='absolute_range',
         crop_size=image_size,
         recompute_bbox=True,
-        allow_negative_crop=True,
-        use_embeds=True),
+        allow_negative_crop=True),
     dict(type='FilterAnnotations', min_gt_bbox_wh=(1e-2, 1e-2)),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size=image_size),  # padding to image_size leads 0.5+ mAP
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_embeds']),
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_embeds', 'gt_embed_bboxes']),
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -86,12 +86,13 @@ lr_config = dict(
     warmup_ratio=0.001,
     step=[162000, 171000, 175500])
 
-zero_shot_head = 'EmbeddingBBoxHead'
+zero_shot_head = 'ViLDBBoxHead'
 evaluation = dict(interval=20000, metric='bbox')
 runner = dict(type='IterBasedRunner', max_iters=180000)
 
 model = dict(
     type='ViLD',
+    backbone=dict(norm_cfg=norm_cfg),
     roi_head=dict(
         type='ViLDRoIHead',
         bbox_head=dict(
@@ -103,7 +104,8 @@ model = dict(
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(loss_weight=1.0),
-            loss_img=dict(type='L1Loss', loss_weight=0.5))),
+            loss_img=dict(type='L1Loss', loss_weight=0.5),
+            norm_cfg=norm_cfg)),
     # model training and testing settings
     test_cfg=dict(
         rcnn=dict(

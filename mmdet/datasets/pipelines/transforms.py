@@ -780,8 +780,7 @@ class RandomCrop:
         }
         if self.use_embeds:
             self.bbox2embed = {
-                'gt_bboxes': ['gt_embeds', 'gt_embed_weights'],
-                'gt_bboxes_ignore': 'gt_embeds_ignore',
+                'gt_embed_bboxes': ['gt_embeds', 'gt_embed_weights']
             }
 
     def _crop_data(self, results, crop_size, allow_negative_crop):

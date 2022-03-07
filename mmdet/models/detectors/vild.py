@@ -22,6 +22,7 @@ class ViLD(TwoStageDetector):
                       gt_bboxes,
                       gt_labels,
                       gt_embeds,
+                      gt_embed_bboxes,
                       gt_embed_weights=None,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
@@ -82,8 +83,9 @@ class ViLD(TwoStageDetector):
 
         roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
                                                  gt_bboxes, gt_labels, gt_embeds,
-                                                 gt_embed_weights, gt_bboxes_ignore, 
-                                                 gt_masks, **kwargs)
+                                                 gt_embed_bboxes, gt_embed_weights, 
+                                                 gt_bboxes_ignore, gt_masks, 
+                                                 **kwargs)
         losses.update(roi_losses)
 
         return losses

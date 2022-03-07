@@ -12,7 +12,8 @@ from mmdet.datasets import PIPELINES
 class LoadEmbeddingFromFile:
     """Load embeddings from file.
 
-    Required keys are "emb_prefix" and "emb_filename". Added key is "gt_embeds".
+    Required keys are "emb_prefix" and "emb_filename". Added key is "gt_embeds", 
+    "gt_embed_bboxes", and "gt_embed_weights" (optional).
     
     Args:
         with_score (bool) : Whether to parse and load the embedding score.
@@ -37,7 +38,7 @@ class LoadEmbeddingFromFile:
             with open(self.ann_file, 'r') as f:
                 weight_data = json.load(f)
             for k, v in weight_data.items():
-                self.embed_weights[int(k)] = v
+                self.embed_weights[k] = v
 
     def __call__(self, results):
         if self.file_client is None:
@@ -50,18 +51,24 @@ class LoadEmbeddingFromFile:
             filename = results['emb_filename']
 
         with open(filename, 'rb') as f:
-            img_embeds = pickle.load(f)
+            data = pickle.load(f)
 
-        ann_ids = results['ann_info']['ann_ids']
-        gt_embeds = [img_embeds[id].astype(np.float32) for id in ann_ids]
+        gt_embeds = data['img_embeds']
+        gt_embed_bboxes = data['bboxes']
+
         if len(gt_embeds) > 0:
-            gt_embeds = np.concatenate(gt_embeds)
+            gt_embeds = np.concatenate(gt_embeds).astype(np.float32)
+            gt_embed_bboxes = np.concatenate(gt_embed_bboxes).astype(np.float32)
         else:
-            gt_embeds = np.empty((0, 512)).astype(np.float32)
+            gt_embeds = np.empty((0.512)).astype(np.float32)
+            gt_embed_bboxes = np.empty((0, 4)).astype(np.float32)
+
         results['gt_embeds'] = gt_embeds
+        results['gt_embed_bboxes'] = gt_embed_bboxes
+        results['bbox_fields'].append('gt_embed_bboxes')
 
         if self.with_score:
-            gt_embed_weights = np.array([self.embed_weights[id] for id in ann_ids])
+            gt_embed_weights = np.array(self.embed_weights[results['emb_filename']])
             results['gt_embed_weights'] = gt_embed_weights.astype(np.float32)
         return results
 

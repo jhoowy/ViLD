@@ -15,7 +15,7 @@ from mmdet.models.utils import build_linear_layer
 
 
 @HEADS.register_module()
-class EmbeddingBBoxHead(BBoxHead):
+class ViLDBBoxHead(BBoxHead):
     r"""Classification based on pre-defined text embedding.
 
     Args:
@@ -26,11 +26,11 @@ class EmbeddingBBoxHead(BBoxHead):
                  base_emb_path,
                  novel_emb_path=None,
                  num_shared_convs=0,
-                 num_shared_fcs=0,
+                 num_shared_fcs=2,
                  num_cls_convs=0,
-                 num_cls_fcs=2,
+                 num_cls_fcs=0,
                  num_reg_convs=0,
-                 num_reg_fcs=2,
+                 num_reg_fcs=0,
                  conv_out_channels=256,
                  fc_out_channels=1024,
                  emb_channels=512,
@@ -43,7 +43,7 @@ class EmbeddingBBoxHead(BBoxHead):
                  init_cfg=None,
                  *args,
                  **kwargs):
-        super(EmbeddingBBoxHead, self).__init__(
+        super(ViLDBBoxHead, self).__init__(
             *args, init_cfg=init_cfg, **kwargs)
         assert (num_shared_convs + num_shared_fcs + num_cls_convs +
                 num_cls_fcs + num_reg_convs + num_reg_fcs > 0)
@@ -179,8 +179,21 @@ class EmbeddingBBoxHead(BBoxHead):
         return branch_convs, branch_fcs, last_layer_dim
 
     def forward(self, x):
+        region_embed = self.forward_embed(x)
         cls_emb = torch.cat((self.text_embeddings, self.bg_embedding), dim=0)
 
+        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
+        logit_scale = self.logit_scale.exp()
+
+        if self.with_cls:
+            cls_score = logit_scale * region_embed @ cls_emb.t()
+        else:
+            cls_score = None
+        bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
+
+        return cls_score, bbox_pred
+
+    def forward_embed(self, x):
         # shared part
         if self.num_shared_convs > 0:
             for conv in self.shared_convs:
@@ -215,147 +228,7 @@ class EmbeddingBBoxHead(BBoxHead):
             x_reg = self.relu(fc(x_reg))
 
         region_embed = F.normalize(self.fc_proj(x_cls), dim=-1)
-        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
-        logit_scale = self.logit_scale.exp()
-        if self.with_cls:
-            cls_score = logit_scale * region_embed @ cls_emb.t()
-        else:
-            cls_score = None
-        bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        return cls_score, bbox_pred, region_embed
-
-    def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes,
-                           pos_gt_labels, pos_gt_embeds, pos_gt_embed_weights,
-                           pos_is_gt, cfg):
-        """Calculate the ground truth for proposals in the single image
-        according to the sampling results.
-
-        Args:
-            pos_bboxes (Tensor): Contains all the positive boxes,
-                has shape (num_pos, 4), the last dimension 4
-                represents [tl_x, tl_y, br_x, br_y].
-            neg_bboxes (Tensor): Contains all the negative boxes,
-                has shape (num_neg, 4), the last dimension 4
-                represents [tl_x, tl_y, br_x, br_y].
-            pos_gt_bboxes (Tensor): Contains gt_boxes for
-                all positive samples, has shape (num_pos, 4),
-                the last dimension 4
-                represents [tl_x, tl_y, br_x, br_y].
-            pos_gt_labels (Tensor): Contains gt_labels for
-                all positive samples, has shape (num_pos, ).
-            pos_gt_embeds (Tensor): Contains gt_embeds for
-                all positive samples, has shape (num_pos, emb_channels).
-            pos_gt_embed_weights (Tensor): Contains weights of gt_embed
-                for all positive samples, has shape (num_pos, ).
-            cfg (obj:`ConfigDict`): `train_cfg` of R-CNN.
-
-        Returns:
-            Tuple[Tensor]: Ground truth for proposals
-            in a single image. Containing the following Tensors:
-
-                - labels(Tensor): Gt_labels for all proposals, has
-                  shape (num_proposals,).
-                - label_weights(Tensor): Labels_weights for all
-                  proposals, has shape (num_proposals,).
-                - bbox_targets(Tensor):Regression target for all
-                  proposals, has shape (num_proposals, 4), the
-                  last dimension 4 represents [tl_x, tl_y, br_x, br_y].
-                - bbox_weights(Tensor):Regression weights for all
-                  proposals, has shape (num_proposals, 4).
-                - embeds(Tensor):Gt_embeds for all proposals, has
-                  shape (num_proposals, emb_channels).
-                - embed_weights(Tensor):Loss weight for all gt embeds, has
-                  shape (num_proposals, emb_channels).
-        """
-        num_pos = pos_bboxes.size(0)
-        num_neg = neg_bboxes.size(0)
-        num_samples = num_pos + num_neg
-
-        # original implementation uses new_zeros since BG are set to be 0
-        # now use empty & fill because BG cat_id = num_classes,
-        # FG cat_id = [0, num_classes-1]
-        labels = pos_bboxes.new_full((num_samples, ),
-                                     self.num_classes,
-                                     dtype=torch.long)
-        embeds = pos_bboxes.new_zeros(num_samples, self.emb_channels)
-        label_weights = pos_bboxes.new_zeros(num_samples)
-        bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
-        bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
-        embed_weights = pos_bboxes.new_zeros(num_samples, self.emb_channels)
-        if num_pos > 0:
-            labels[:num_pos] = pos_gt_labels
-            embeds[:num_pos] = pos_gt_embeds
-            embed_weights[:num_pos, :] = 1
-            if len(pos_gt_embed_weights) > 0:
-                embed_weights[:num_pos, :] = pos_gt_embed_weights.unsqueeze(-1)
-            embed_weights[:num_pos, :] *= pos_is_gt.unsqueeze(-1)
-            pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
-            label_weights[:num_pos] = pos_weight
-            if not self.reg_decoded_bbox:
-                pos_bbox_targets = self.bbox_coder.encode(
-                    pos_bboxes, pos_gt_bboxes)
-            else:
-                # When the regression loss (e.g. `IouLoss`, `GIouLoss`)
-                # is applied directly on the decoded bounding boxes, both
-                # the predicted boxes and regression targets should be with
-                # absolute coordinate format.
-                pos_bbox_targets = pos_gt_bboxes
-            bbox_targets[:num_pos, :] = pos_bbox_targets
-            bbox_weights[:num_pos, :] = 1
-        if num_neg > 0:
-            label_weights[-num_neg:] = 1.0
-
-        return labels, label_weights, bbox_targets, bbox_weights, \
-               embeds, embed_weights
-
-    def get_targets(self,
-                    sampling_results,
-                    gt_bboxes,
-                    gt_labels,
-                    gt_embeds,
-                    gt_embed_weights,
-                    rcnn_train_cfg,
-                    concat=True):
-        """
-
-        """
-        pos_bboxes_list = [res.pos_bboxes for res in sampling_results]
-        neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
-        pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
-        pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
-        pos_gt_embeds_list = []
-        pos_gt_embed_weights_list = []
-        pos_is_gt_list = [res.pos_is_gt for res in sampling_results]
-        for i, res in enumerate(sampling_results):
-            pos_gt_embeds_list.append(gt_embeds[i][res.pos_assigned_gt_inds])
-            if gt_embed_weights is not None:
-                pos_gt_embed_weights_list.append(gt_embed_weights[i][res.pos_assigned_gt_inds])
-            else:
-                if self.use_img_loss:
-                    pos_gt_embed_weights_list.append(torch.ones_like(pos_gt_labels_list[i]))
-                else:
-                    pos_gt_embed_weights_list.append(torch.zeros_like(pos_gt_labels_list[i]))
-        labels, label_weights, bbox_targets, bbox_weights, \
-        embeds, embed_weights = multi_apply(
-            self._get_target_single,
-            pos_bboxes_list,
-            neg_bboxes_list,
-            pos_gt_bboxes_list,
-            pos_gt_labels_list,
-            pos_gt_embeds_list,
-            pos_gt_embed_weights_list,
-            pos_is_gt_list,
-            cfg=rcnn_train_cfg)
-
-        if concat:
-            labels = torch.cat(labels, 0)
-            label_weights = torch.cat(label_weights, 0)
-            bbox_targets = torch.cat(bbox_targets, 0)
-            bbox_weights = torch.cat(bbox_weights, 0)
-            embeds = torch.cat(embeds, 0)
-            embed_weights = torch.cat(embed_weights, 0)
-        return labels, label_weights, bbox_targets, bbox_weights, embeds, \
-               embed_weights
+        return region_embed
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred'))
     def loss(self,
@@ -420,20 +293,17 @@ class EmbeddingBBoxHead(BBoxHead):
                 losses['loss_bbox'] = bbox_pred[pos_inds].sum()
 
         if region_embed is not None and self.use_img_loss:
-            # image loss condition is same with bounding box regression
-            bg_class_ind = self.num_classes
-            pos_inds = (labels >= 0) & (labels < bg_class_ind)
-            if pos_inds.any():
-                region_embed_pred = region_embed[pos_inds.type(torch.bool)]
-                losses['loss_img'] = self.loss_img(
-                    region_embed_pred,
-                    embeds[pos_inds.type(torch.bool)],
-                    embed_weights[pos_inds.type(torch.bool)],
-                    avg_factor=embeds.size(0),
-                    reduction_override=reduction_override
-                )
-            else:
-                losses['loss_img'] = region_embed[pos_inds].sum()
+            if embed_weights is not None:
+                embed_weights = embed_weights.unsqueeze(-1)
+                embed_weights = embed_weights.expand(-1, self.embed_channels)
+
+            losses['loss_img'] = self.loss_img(
+                region_embed,
+                embeds,
+                embed_weights,
+                avg_factor=embeds.size(0),
+                reduction_override=reduction_override
+            )
 
         return losses
     
@@ -460,69 +330,3 @@ class EmbeddingBBoxHead(BBoxHead):
                              f"but found {class_set}")
         
         self.num_classes = self.text_embeddings.shape[0]
-
-        
-    @force_fp32(apply_to=('cls_score', 'bbox_pred'))
-    def get_bboxes(self,
-                   rois,
-                   cls_score,
-                   bbox_pred,
-                   img_shape,
-                   scale_factor,
-                   rescale=False,
-                   cfg=None):
-        """Transform network output for a batch into bbox predictions.
-
-        Args:
-            rois (Tensor): Boxes to be transformed. Has shape (num_boxes, 5).
-                last dimension 5 arrange as (batch_index, x1, y1, x2, y2).
-            cls_score (Tensor): Box scores, has shape
-                (num_boxes, num_classes + 1).
-            bbox_pred (Tensor, optional): Box energies / deltas.
-                has shape (num_boxes, num_classes * 4).
-            img_shape (Sequence[int], optional): Maximum bounds for boxes,
-                specifies (H, W, C) or (H, W).
-            scale_factor (ndarray): Scale factor of the
-               image arrange as (w_scale, h_scale, w_scale, h_scale).
-            rescale (bool): If True, return boxes in original image space.
-                Default: False.
-            cfg (obj:`ConfigDict`): `test_cfg` of Bbox Head. Default: None
-
-        Returns:
-            tuple[Tensor, Tensor]:
-                First tensor is `det_bboxes`, has the shape
-                (num_boxes, 5) and last
-                dimension 5 represent (tl_x, tl_y, br_x, br_y, score).
-                Second tensor is the labels with shape (num_boxes, ).
-        """
-
-        # some loss (Seesaw loss..) may have custom activation
-        if self.custom_cls_channels:
-            scores = self.loss_cls.get_activation(cls_score)
-        else:
-            scores = F.softmax(
-                cls_score, dim=-1) if cls_score is not None else None
-        # bbox_pred would be None in some detector when with_reg is False,
-        # e.g. Grid R-CNN.
-        if bbox_pred is not None:
-            bboxes = self.bbox_coder.decode(
-                rois[..., 1:], bbox_pred, max_shape=img_shape)
-        else:
-            bboxes = rois[:, 1:].clone()
-            if img_shape is not None:
-                bboxes[:, [0, 2]].clamp_(min=0, max=img_shape[1])
-                bboxes[:, [1, 3]].clamp_(min=0, max=img_shape[0])
-
-        if rescale and bboxes.size(0) > 0:
-            scale_factor = bboxes.new_tensor(scale_factor)
-            bboxes = (bboxes.view(bboxes.size(0), -1, 4) / scale_factor).view(
-                bboxes.size()[0], -1)
-
-        if cfg is None:
-            return bboxes, scores
-        else:
-            det_bboxes, det_labels = multiclass_nms(bboxes, scores,
-                                                    cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img)
-
-            return det_bboxes, det_labels
