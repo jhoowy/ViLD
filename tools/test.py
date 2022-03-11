@@ -103,6 +103,11 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument(
+        '--zero_shot', 
+        action='store_true',
+        help='whether to train with zero-shot setting. config file must have '
+        'zero shot head config.')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -209,13 +214,14 @@ def main():
     model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
 
     # switch class for zero-shot prediction
-    head_type = cfg.get('zero_shot_head', None)
-    assert head_type is not None
-    head_type = HEADS.get(head_type)
-    assert hasattr(head_type, 'switch_class')
-    for name, m in model.named_modules():
-        if isinstance(m, head_type):
-            m.switch_class('novel')
+    if args.zero_shot:
+        head_type = cfg.get('zero_shot_head', None)
+        assert head_type is not None
+        head_type = HEADS.get(head_type)
+        assert hasattr(head_type, 'switch_class')
+        for name, m in model.named_modules():
+            if isinstance(m, head_type):
+                m.switch_class('novel')
 
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:

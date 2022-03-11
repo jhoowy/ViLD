@@ -136,6 +136,27 @@ class LVISClipRareDataset(LVISV1Dataset):
         self.pre_pipeline(results)
         return self.pipeline(results)
 
+    def prepare_test_img(self, idx):
+        """Get test data and annotations after pipeline.
+        Image embedding is added in this dataset.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Training data and annotation after pipeline with new keys \
+                introduced by pipeline.
+        """
+
+        img_info = self.data_infos[idx]
+        emb_filename = '.'.join((img_info['filename'].split('.')[0], 'pickle'))
+        results = dict(img_info=img_info, emb_prefix=self.emb_prefix, 
+                       emb_filename=emb_filename)
+        if self.proposals is not None:
+            results['proposals'] = self.proposals[idx]
+        self.pre_pipeline(results)
+        return self.pipeline(results)
+
     def _parse_ann_info(self, img_info, ann_info):
         """Parse bbox and mask annotation. Annotation id is added to load
         iamge embedding later.

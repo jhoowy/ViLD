@@ -28,7 +28,8 @@ train_pipeline = [
         crop_type='absolute_range',
         crop_size=image_size,
         recompute_bbox=True,
-        allow_negative_crop=True),
+        allow_negative_crop=True,
+        use_embeds=True),
     dict(type='FilterAnnotations', min_gt_bbox_wh=(1e-2, 1e-2)),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
@@ -84,11 +85,11 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=1000,
     warmup_ratio=0.001,
-    step=[162000, 171000, 175500])
+    step=[81000, 85500, 87750])
 
 zero_shot_head = 'ViLDBBoxHead'
 evaluation = dict(interval=20000, metric='bbox')
-runner = dict(type='IterBasedRunner', max_iters=180000)
+runner = dict(type='IterBasedRunner', max_iters=90000)
 
 model = dict(
     type='ViLD',

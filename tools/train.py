@@ -13,7 +13,7 @@ from mmcv.runner import get_dist_info, init_dist
 from mmcv.utils import get_git_hash
 
 from mmdet import __version__
-from mmdet.apis import init_random_seed, set_random_seed, train_detector
+from mmdet.apis import init_random_seed, set_random_seed, train_detector, zero_shot_train_detector
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 from mmdet.utils import collect_env, get_root_logger, setup_multi_processes
@@ -79,6 +79,12 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument(
+        '--zero_shot', 
+        action='store_true',
+        help='whether to train with zero-shot setting. config file must have '
+        'zero shot head config.')
+
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -195,7 +201,10 @@ def main():
             CLASSES=datasets[0].CLASSES)
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
-    train_detector(
+    train_function = zero_shot_train_detector if args.zero_shot \
+                     else train_detector
+
+    train_function(
         model,
         datasets,
         cfg,

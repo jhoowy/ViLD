@@ -77,7 +77,7 @@ data = dict(
         pipeline=test_pipeline))
 
 # optimizer
-optimizer = dict(type='SGD', lr=0.032, momentum=0.9, weight_decay=4e-5)
+optimizer = dict(type='SGD', lr=0.001, momentum=0.9, weight_decay=4e-5)
 optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(
@@ -85,11 +85,11 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=1000,
     warmup_ratio=0.001,
-    step=[162000, 171000, 175500])
+    step=[81000, 85500, 87750])
 
 zero_shot_head = 'ViLDBBoxHead'
 evaluation = dict(interval=20000, metric='segm')
-runner = dict(type='IterBasedRunner', max_iters=180000)
+runner = dict(type='IterBasedRunner', max_iters=90000)
 
 model = dict(
     type='ViLD',

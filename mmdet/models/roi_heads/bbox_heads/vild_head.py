@@ -215,8 +215,9 @@ class ViLDBBoxHead(BBoxHead):
         region_embed = F.normalize(self.fc_proj(x_cls), dim=-1)
         cls_emb = torch.cat((self.text_embeddings, self.bg_embedding), dim=0)
 
-        self.logit_scale.data.clamp_(-np.log(100), np.log(100))
-        logit_scale = self.logit_scale.exp()
+        # self.logit_scale.data.clamp_(-np.log(100), np.log(100))
+        # logit_scale = self.logit_scale.exp()
+        logit_scale = 100.
 
         if self.with_cls:
             cls_score = logit_scale * region_embed @ cls_emb.t()

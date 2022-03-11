@@ -1,4 +1,3 @@
-# Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import os
 import os.path as osp
@@ -18,6 +17,10 @@ from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.models import build_detector, HEADS
 from mmdet.utils import setup_multi_processes
+
+# Extract proposal list from pretrained model
+# Currently, only support single gpu inference
+# TODO: (1) Remove unnecessary codes (2) Implement multi-gpu inference
 
 
 def parse_args():

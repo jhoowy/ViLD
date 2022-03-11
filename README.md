@@ -21,8 +21,9 @@ apt-get update
 apt-get install libgl1-mesa-glx
 ```
 
-## Dataset preparation
+## Data preparation
 
+### Dataset download
 Please download [LVIS dataset](https://www.lvisdataset.org/) and organize them as following:
 
 ```
@@ -34,23 +35,44 @@ data_root/
     └── lvis_v1_val.json
 ```
 
-## Preparing embeddings
+### Preparing proposals & embeddings
 
-Before start to training, image and text embeddings must be prepared.
+Before start to training and testing ViLD, precomputed region proposals,
+image embeddings, and text embeddings must be prepared.
 
-1. Preparing image embeddings:
+1. **Preparing region proposals**
+    
+    To extract region proposals, the baseline RPN model should be prepared.
+    You can train it yourself by following training command:
+    ```
+    ./tools/dist_train.sh configs/mask_rcnn_r50_fpn_lvis.py ${GPUS}
+    ```
+
+    After train baseline model, you extract proposals for training by following command:
+    ```
+    ./tools/extract_proposal.sh configs/mask_rcnn_r50_fpn_proposal.py \
+        ${CHECKPOINT_FILE} \
+        ${GPUS} \
+        --out-dir proposals
+    ```
+
+    If you want to extract proposals for validation, you should change the 67~71 line as below
+    ```
+    test=dict(
+        type='LVISClipCFDataset',
+        ann_file=data_root + 'annotations/lvis_v1_train.json',
+        img_prefix=data_root,
+        pipeline=test_pipeline))
+    ```
+
+2. **Preparing image embeddings**
     ```
     python CLIP_embedder/img2emb.py --data_root ${DATA_ROOT}
     ```
 
-2. Preparing text embeddings:
+3. **Preparing text embeddings**
     ```
     python CLIP_embedder/text2emb.py --data_root ${DATA_ROOT}
-    ```
-
-3. Preparing embedding weights:
-    ```
-    python CLIP_embedder/calc_emb_score.py --data_root ${DATA_ROOT}
     ```
 
 ## Training
@@ -58,7 +80,7 @@ Before start to training, image and text embeddings must be prepared.
 ### Training on single node
 
 ```
-PORT=$PORT ./tools/dist_train.sh \
+./tools/dist_train.sh \
     ${CONFIG_FILE} \
     ${GPUS}
 ```
@@ -66,7 +88,7 @@ PORT=$PORT ./tools/dist_train.sh \
 For example, the command for training Mask-RCNN-ViLD on 4 GPUs is as following:
 
 ```
-PORT=$PORT ./tools/dist_train.sh configs/vild/mask_rcnn_r50_vild_sl_lvis.py 4
+./tools/dist_train.sh configs/vild/mask_rcnn_r50_vild_lvis.py 4
 ```
 
 ### Training on multiple node
@@ -78,21 +100,22 @@ PORT=$PORT ./tools/dist_train_multi.sh \
     ${GPUS} \
     ${NNODES} \
     ${NODE_RANK} \
-    ${ADDRESS}
+    ${ADDRESS} \
+    --zero_shot
 ```
 
 For example, the command for training Mask-RCNN-ViLD on 2 nodes of each with 4 GPU is as following:
 
 On node 1:
 ```
-PORT=${PORT} ./tools/dist_train_multi.sh configs/vild/mask_rcnn_r50_vild_sl_lvis.py \
-    4 2 0 ${ADDRESS}
+PORT=${PORT} ./tools/dist_train_multi.sh configs/vild/mask_rcnn_r50_vild_lvis.py \
+    4 2 0 ${ADDRESS} --zero_shot
 ```
 
 On node 2:
 ```
-PORT=${PORT} ./tools/dist_train_multi.sh configs/vild/mask_rcnn_r50_vild_sl_lvis.py \
-    4 2 1 ${ADDRESS}
+PORT=${PORT} ./tools/dist_train_multi.sh configs/vild/mask_rcnn_r50_vild_lvis.py \
+    4 2 1 ${ADDRESS} --zero_shot
 ```
 
 ## Test
@@ -100,7 +123,7 @@ PORT=${PORT} ./tools/dist_train_multi.sh configs/vild/mask_rcnn_r50_vild_sl_lvis
 ### Testing on single GPU
 
 ```
-PORT=$PORT python tools/test.py \
+python tools/test.py \
     ${CONFIG_FILE} \
     ${CHECKPOINT_FILE} \
     [--out ${RESULT_FILE}] \
@@ -124,13 +147,11 @@ PORT=$PORT ./tools/dist_test.sh \
 
 $EVAL_METRICS should be `bbox` or `segm`
 
+### Testing CLIP on cropped regions
 
-## NOTE
-
-There is a bug in PyTorch==1.8.1
-
-You should modify `torch/optim/adamw.py` to train DETR-ViLD model with adamw.
-
-Specifically, the following line 100 should move to line 76.
-
-`beta1, beta2 = group['betas']`
+```
+./tools/dist_test.sh configs/mask_rcnn/mask_rcnn_r50_fpn_lvis_clip.py \
+    ${CHECKPOINT_FILE} \
+    ${GPUS} \
+    --eval segm
+```
